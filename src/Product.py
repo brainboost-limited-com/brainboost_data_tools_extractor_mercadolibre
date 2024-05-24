@@ -2,6 +2,7 @@ from bs4 import BeautifulSoup
 from brainboost_data_source_requests_package.Request import Request
 
 
+
 class Product:
     def __init__(self) -> None:
         pass
@@ -10,7 +11,8 @@ class Product:
     def product_from(url=None, soup=None):
         if url:
             try:
-                response = Request.get(page=url, data={})
+                product_data_request = Request()
+                response = product_data_request.get(page=url, data={})
                 response.raise_for_status()  # Raise an HTTPError on bad status
                 soup = BeautifulSoup(response.text, 'html.parser')
             except Exception as e:

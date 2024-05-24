@@ -10,47 +10,80 @@ import re
 # Initialize TinyDB to persist visited links
 db = TinyDB(storage_local_mercadolibre_colombia_visited_links)
 
+def process_product_page(url):
+    product_code_pattern = r"/p/([A-Z0-9]+)\?"
+    if re.search(product_code_pattern, url):
+        product_id = re.search(product_code_pattern, url).group(1)
+        return {
+            'type': 'product_page',
+            'productId': product_id,
+            'productName': " ".join(product_id.split("_")).capitalize()  # Capitalizing product name
+        }
+    return None
+
+def process_category_page(url):
+    split_url = urlparse(url).path.split('/')
+    if len(split_url) >= 5:
+        return {
+            'type': 'category_page',
+            'categoryName': split_url[4].split("#")[0]
+        }
+    return None
+
+def process_deal_page(url):
+    if "listado.mercadolibre.com.co/_Deal_" in url:
+        return {
+            'type': 'deal_page',
+            'dealName': url.split("_Deal_")[1].split("#")[0]
+        }
+    return None
+
+def process_filtered_search_results(url):
+    if "listado.mercadolibre.com.co/" in url and "_" in url:
+        return {
+            'type': 'filtered_search_results',
+            'searchTerm': url.split("/")[4].split("_")[0],
+            'filters': "_".join(url.split("_")[1:]).split("#")[0]
+        }
+    return None
+
+def process_home_page(url):
+    if url == "https://www.mercadolibre.com.co/":
+        return {'type': 'home_page'}
+    return None
+
 def process_url(url):
     result = {}
 
     # Check if the URL is from a known domain
     if "mercadolibre.com.co" not in url:
-        result['type'] = "unknown"
+        return {'type': "unknown"}
+
+    # Try each specific URL processor
+    result = process_product_page(url)
+    if result:
         return result
 
-    product_code_pattern = r"/p/([A-Z0-9]+)\?"
-    
-    if re.search(product_code_pattern, url):
-        # Product Page
-        result['type'] = "product_page"
-        product_id = re.search(product_code_pattern, url).group(1)
-        result['productId'] = product_id
-        result['productName'] = " ".join(product_id.split("_")).capitalize()  # Capitalizing product name
-    elif "www.mercadolibre.com.co/c/" in url:
-        # Category Page
-        split_url = urlparse(url).path.split('/')
-        if len(split_url) >= 5:
-            result['type'] = "category_page"
-            result['categoryName'] = split_url[4].split("#")[0]
-        else:
-            result['type'] = "unknown"
-    elif "listado.mercadolibre.com.co/_Deal_" in url:
-        # Deal Page
-        result['type'] = "deal_page"
-        result['dealName'] = url.split("_Deal_")[1].split("#")[0]
-    elif "listado.mercadolibre.com.co/" in url and "_" in url:
-        # Filtered Search Result
-        result['type'] = "filtered_search_results"
-        result['searchTerm'] = url.split("/")[4].split("_")[0]
-        result['filters'] = "_".join(url.split("_")[1:]).split("#")[0]
-    elif url == "https://www.mercadolibre.com.co/":
-        # Home Page
-        result['type'] = "home_page"
-    else:
-        # Unknown type
-        print(f"Unknown URL type: {url}")
-        result['type'] = "unknown"
-    return result
+    result = process_category_page(url)
+    if result:
+        return result
+
+    result = process_deal_page(url)
+    if result:
+        return result
+
+    result = process_filtered_search_results(url)
+    if result:
+        return result
+
+    result = process_home_page(url)
+    if result:
+        return result
+
+    # If none of the specific processors matched, return unknown
+    return {'type': 'unknown'}
+
+
 
 def is_internal_link(url, base_url):
     # Check if the URL belongs to the same domain
@@ -101,7 +134,7 @@ def traverse_website(root_url):
                 classified_links.append(classified_link)
 
         if process_url(current_url)['type'] == "product_page":
-            product_data = Product.product_from(url=current_url)  # Fetch product data using the URL
+            product_data = Product.product_from(soup=soup)  # Fetch product data using the URL
             if product_data:
                 product_data_list.append(product_data)
 
